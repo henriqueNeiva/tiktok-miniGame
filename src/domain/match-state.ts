@@ -7,6 +7,13 @@ export const TEAM_HEAL_AMOUNT = 50;
 export const TEAM_ATTACK_THRESHOLD = 500;
 export const TEAM_ATTACK_DAMAGE = 50;
 export const TACTICAL_CHARGES_PER_ROSE = 1;
+export const INITIAL_PLAYER_ENERGY = 2;
+export const MAX_PLAYER_ENERGY = 5;
+export const LIKES_PER_ENERGY = 25;
+export const ATTACK_ENERGY_COST = 2;
+export const DEFEND_ENERGY_COST = 2;
+export const HEAL_ENERGY_COST = 3;
+export const DEFEND_SHIELD_AMOUNT = 30;
 
 export type MatchPhase = 'LOBBY' | 'ACTIVE' | 'FINISHED';
 
@@ -18,6 +25,7 @@ export type PlayerProfile = {
   score: number;
   likes: number;
   attacks: number;
+  energy: number;
 };
 
 export type JoinResult = {
@@ -43,6 +51,7 @@ export type AttackResult = {
   damage: number;
   targetKingHp: number;
   kingDefeated: boolean;
+  shieldAbsorbed: number;
 };
 
 export type GiftUpdate = {
@@ -60,6 +69,8 @@ export type MatchSnapshot = {
   kingHp: Record<Team, number>;
   teamLikes: Record<Team, number>;
   tacticalCharges: Record<Team, number>;
+  kingShield: Record<Team, number>;
+  players: PlayerProfile[];
 };
 
 export class MatchState {
@@ -71,6 +82,7 @@ export class MatchState {
   private readonly teamHealThresholds = new Map<Team, number>();
   private readonly teamAttackThresholds = new Map<Team, number>();
   private readonly tacticalCharges: Record<Team, number> = { azul: 0, vermelho: 0 };
+  private readonly kingShield: Record<Team, number> = { azul: 0, vermelho: 0 };
   private readonly profiles = new Map<string, PlayerProfile>();
   private totalLikes = 0;
   private phase: MatchPhase = 'LOBBY';
@@ -82,7 +94,7 @@ export class MatchState {
     if (currentTeam) return { team: currentTeam, alreadyJoined: true };
     const team = requestedTeam ?? this.chooseBalancedTeam(random);
     this.players.set(user, team);
-    this.profiles.set(user, { user, team, xp: 10, level: 1, score: 10, likes: 0, attacks: 0 });
+    this.profiles.set(user, { user, team, xp: 10, level: 1, score: 10, likes: 0, attacks: 0, energy: INITIAL_PLAYER_ENERGY });
     if (this.phase === 'LOBBY') this.phase = 'ACTIVE';
     return { team, alreadyJoined: false };
   }
@@ -108,6 +120,8 @@ export class MatchState {
       kingHp: { ...this.kingHp },
       teamLikes: { ...this.teamLikes },
       tacticalCharges: { ...this.tacticalCharges },
+      kingShield: { ...this.kingShield },
+      players: [...this.profiles.values()].map(profile => ({ ...profile })),
     };
   }
 
@@ -130,7 +144,9 @@ export class MatchState {
     this.playerLikes.set(user, playerLikes);
     const profile = this.profiles.get(user);
     if (profile) {
+      const energyEarned = Math.floor(playerLikes / LIKES_PER_ENERGY) - Math.floor((playerLikes - count) / LIKES_PER_ENERGY);
       profile.likes += count;
+      profile.energy = Math.min(MAX_PLAYER_ENERGY, profile.energy + energyEarned);
       const likeMilestones = Math.floor(playerLikes / 100) - Math.floor((playerLikes - count) / 100);
       profile.score += likeMilestones * 10;
       profile.xp += likeMilestones * 10;
@@ -165,21 +181,43 @@ export class MatchState {
   }
 
   applyAttack(attackingTeam: Team, damage = LIKE_ATTACK_DAMAGE, user?: string): AttackResult {
-    if (this.phase === 'FINISHED') return { attackingTeam, targetTeam: attackingTeam === 'azul' ? 'vermelho' : 'azul', damage: 0, targetKingHp: this.kingHp[attackingTeam === 'azul' ? 'vermelho' : 'azul'], kingDefeated: false };
+    if (this.phase === 'FINISHED') return { attackingTeam, targetTeam: attackingTeam === 'azul' ? 'vermelho' : 'azul', damage: 0, targetKingHp: this.kingHp[attackingTeam === 'azul' ? 'vermelho' : 'azul'], kingDefeated: false, shieldAbsorbed: 0 };
     const targetTeam: Team = attackingTeam === 'azul' ? 'vermelho' : 'azul';
     const attackerLevel = user ? this.profiles.get(user)?.level ?? 1 : 1;
     const levelBonus = Math.min(5, Math.max(0, Math.floor((attackerLevel - 1) / 2)));
     const appliedDamage = damage === LIKE_ATTACK_DAMAGE ? damage + levelBonus : damage;
-    const targetKingHp = Math.max(0, this.kingHp[targetTeam] - appliedDamage);
+    const shieldAbsorbed = Math.min(this.kingShield[targetTeam], appliedDamage);
+    this.kingShield[targetTeam] -= shieldAbsorbed;
+    const healthDamage = appliedDamage - shieldAbsorbed;
+    const targetKingHp = Math.max(0, this.kingHp[targetTeam] - healthDamage);
     this.kingHp[targetTeam] = targetKingHp;
+    if (user) {
+      const profile = this.profiles.get(user);
+      if (profile) profile.attacks += 1;
+    }
     if (targetKingHp === 0) { this.phase = 'FINISHED'; this.winner = attackingTeam; }
-    return { attackingTeam, targetTeam, damage: appliedDamage, targetKingHp, kingDefeated: targetKingHp === 0 };
+    return { attackingTeam, targetTeam, damage: healthDamage, targetKingHp, kingDefeated: targetKingHp === 0, shieldAbsorbed };
   }
 
   applyTeamHeal(team: Team): number {
     if (this.phase === 'FINISHED') return this.kingHp[team];
     this.kingHp[team] = Math.min(INITIAL_KING_HP, this.kingHp[team] + TEAM_HEAL_AMOUNT);
     return this.kingHp[team];
+  }
+
+  addShield(team: Team, amount = DEFEND_SHIELD_AMOUNT): number {
+    if (this.phase !== 'FINISHED') this.kingShield[team] = Math.min(100, this.kingShield[team] + amount);
+    return this.kingShield[team];
+  }
+
+  spendEnergy(user: string, cost: number): boolean {
+    const profile = this.profiles.get(user);
+    if (!profile || profile.energy < cost || this.phase !== 'ACTIVE') return false;
+    profile.energy -= cost;
+    profile.score += 10;
+    profile.xp += 5;
+    profile.level = this.levelFor(profile.xp);
+    return true;
   }
 
   addGift(user: string, quantity: number): GiftUpdate {

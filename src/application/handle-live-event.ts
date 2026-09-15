@@ -1,17 +1,36 @@
 import type { HandleLiveEvent, Log } from './ports.js';
-import { LIKE_ATTACK_DAMAGE, MatchState, TEAM_ATTACK_DAMAGE, type Team } from '../domain/match-state.js';
+import {
+  ATTACK_ENERGY_COST,
+  DEFEND_ENERGY_COST,
+  HEAL_ENERGY_COST,
+  LIKE_ATTACK_DAMAGE,
+  MatchState,
+  TEAM_ATTACK_DAMAGE,
+  type MatchSnapshot,
+  type Team,
+} from '../domain/match-state.js';
 
 const commands: Record<string, string> = {
   '!entrar': 'PLAYER_JOIN',
-  '!atacar': 'PLAYER_ATTACK', '!defender': 'PLAYER_DEFEND', '!curar': 'PLAYER_HEAL', '!boss': 'PLAYER_BOSS',
+  '!atacar': 'PLAYER_ATTACK', '!defender': 'PLAYER_DEFEND', '!curar': 'PLAYER_HEAL',
 };
 
-export function createInterpreter(log: Log, random: () => number = Math.random): HandleLiveEvent {
+export type GameInterpreter = HandleLiveEvent & {
+  snapshot(): MatchSnapshot;
+  advanceTime(seconds: number): MatchSnapshot;
+};
+
+export function createInterpreter(
+  log: Log,
+  random: () => number = Math.random,
+  onSnapshot?: (snapshot: MatchSnapshot) => void,
+): GameInterpreter {
   let acceptedCommands = 0;
   let gifts = 0;
   const match = new MatchState();
-  return event => {
-    log('INTERNAL_EVENT', { event });
+  const handle: HandleLiveEvent = event => {
+    try {
+      log('INTERNAL_EVENT', { event });
     if (event.type === 'LIKE_RECEIVED') {
       const update = match.recordLikes(event.user, event.count, event.total);
       log('PLAYER_LIKES_UPDATED', { user: event.user, count: event.count, playerLikes: update.playerLikes, team: update.team });
@@ -72,11 +91,49 @@ export function createInterpreter(log: Log, random: () => number = Math.random):
       log('COMMENT_IGNORED', { user: event.user, reason: 'already_joined', team });
       return;
     }
-    acceptedCommands++;
-    const join = command === '!entrar' ? match.join(event.user, requestedTeam as Team | undefined, random) : undefined;
-    const team = join?.team;
-    log('COMMAND', { user: event.user, command, action, team });
-    log('RESULT', { user: event.user, action, team, acceptedCommands,
-      response: team ? `@${event.user} entrou no time ${team}.` : `@${event.user}: ${command} reconhecido e registrado localmente.` });
+      if (command === '!entrar') {
+        acceptedCommands++;
+        const join = match.join(event.user, requestedTeam as Team | undefined, random);
+        log('COMMAND', { user: event.user, command, action, team: join.team });
+        log('RESULT', { user: event.user, action, team: join.team, acceptedCommands,
+          response: `@${event.user} entrou no time ${join.team}.` });
+        return;
+      }
+
+      const team = match.teamOf(event.user);
+      if (!team) {
+        log('COMMENT_IGNORED', { user: event.user, command, reason: 'player_not_joined' });
+        return;
+      }
+      const cost = action === 'PLAYER_ATTACK' ? ATTACK_ENERGY_COST : action === 'PLAYER_DEFEND' ? DEFEND_ENERGY_COST : HEAL_ENERGY_COST;
+      if (!match.spendEnergy(event.user, cost)) {
+        log('COMMENT_IGNORED', { user: event.user, command, reason: 'insufficient_energy', requiredEnergy: cost,
+          energy: match.profileOf(event.user)?.energy ?? 0 });
+        return;
+      }
+      acceptedCommands++;
+      log('COMMAND', { user: event.user, command, action, team, cost });
+      if (action === 'PLAYER_ATTACK') {
+        const damage = match.applyAttack(team, LIKE_ATTACK_DAMAGE, event.user);
+        log('DAMAGE_APPLIED', { action, user: event.user, attackingTeam: team, targetTeam: damage.targetTeam,
+          damage: damage.damage, shieldAbsorbed: damage.shieldAbsorbed, targetKingHp: damage.targetKingHp });
+      } else if (action === 'PLAYER_DEFEND') {
+        log('SHIELD_APPLIED', { action, user: event.user, team, shield: match.addShield(team) });
+      } else {
+        log('TEAM_HEAL_APPLIED', { action, user: event.user, team, amount: 50, kingHp: match.applyTeamHeal(team) });
+      }
+      log('RESULT', { user: event.user, action, team, acceptedCommands, energy: match.profileOf(event.user)?.energy,
+        response: `@${event.user} usou ${command} pelo time ${team}.` });
+    } finally {
+      onSnapshot?.(match.snapshot());
+    }
   };
+  return Object.assign(handle, {
+    snapshot: () => match.snapshot(),
+    advanceTime: (seconds: number) => {
+      const snapshot = match.advanceTime(seconds);
+      onSnapshot?.(snapshot);
+      return snapshot;
+    },
+  });
 }

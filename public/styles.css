@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@700;800;900&display=swap');
+
+:root {
+  color-scheme: dark;
+  font-family: 'Nunito', system-ui, sans-serif;
+  --ink: #183647;
+  --cream: #fff7dc;
+  --blue: #35b8ff;
+  --blue-dark: #0969c4;
+  --red: #ff5c71;
+  --red-dark: #c92c50;
+  --gold: #ffd456;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #102b38; }
+body { display: grid; place-items: center; }
+
+.game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-width: 960px;
+  min-height: 540px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+#arena, .vignette { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vignette { pointer-events: none; box-shadow: inset 0 0 120px rgba(8, 27, 34, .55); z-index: 1; }
+
+.scoreboard {
+  position: absolute;
+  z-index: 5;
+  top: 2.2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(88%, 1480px);
+  display: grid;
+  grid-template-columns: 1fr 190px 1fr;
+  align-items: center;
+  filter: drop-shadow(0 8px 8px rgba(10, 35, 45, .28));
+}
+
+.king-card {
+  position: relative;
+  height: 92px;
+  padding: 13px 28px 12px;
+  background: rgba(255, 250, 226, .96);
+  border: 5px solid #fff7dc;
+  box-shadow: inset 0 -5px rgba(57, 42, 28, .12), 0 0 0 3px rgba(24, 54, 71, .55);
+  color: var(--ink);
+}
+.king-card.blue { border-radius: 28px 5px 5px 28px; padding-right: 45px; }
+.king-card.red { border-radius: 5px 28px 28px 5px; padding-left: 45px; }
+.king-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; }
+.king-card.red .king-copy { flex-direction: row-reverse; }
+.team-name { font: 800 20px/1 'Baloo 2', sans-serif; letter-spacing: .08em; }
+.king-copy strong { font: 900 22px/1 'Nunito', sans-serif; white-space: nowrap; }
+.hp-track, .goal-track { height: 22px; margin-top: 10px; border-radius: 999px; background: #d8d4c3; padding: 4px; box-shadow: inset 0 2px 3px rgba(33, 46, 49, .25); overflow: hidden; }
+.hp-track span, .goal-track span { display: block; height: 100%; width: 100%; border-radius: inherit; transition: width .45s cubic-bezier(.2, .8, .2, 1); }
+.blue .hp-track span { background: linear-gradient(90deg, #157ee3, #42d8ff); box-shadow: inset 0 3px rgba(255,255,255,.28); }
+.red .hp-track span { margin-left: auto; background: linear-gradient(90deg, #ff8390, #e83058); box-shadow: inset 0 3px rgba(255,255,255,.28); }
+.shield { position: absolute; bottom: -24px; padding: 5px 12px; border: 3px solid #fff7dc; border-radius: 999px; background: #44657b; font-size: 14px; box-shadow: 0 3px 0 rgba(24,54,71,.45); }
+.blue .shield { left: 24px; }
+.red .shield { right: 24px; }
+
+.clock-card {
+  z-index: 2;
+  height: 122px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--cream);
+  border: 5px solid #fff7dc;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #284f63, #173746);
+  box-shadow: inset 0 -7px rgba(0,0,0,.18), 0 0 0 3px rgba(24,54,71,.58);
+}
+.clock-card span { color: var(--gold); font: 800 13px/1 'Nunito'; letter-spacing: .16em; }
+.clock-card strong { font: 800 45px/.95 'Baloo 2'; text-shadow: 0 4px rgba(0,0,0,.22); }
+.clock-card small { font-size: 10px; letter-spacing: .12em; opacity: .75; }
+.clock-card.climax { animation: clock-pulse 1s infinite; background: linear-gradient(180deg, #8d3542, #472738); }
+
+.mission-card, .event-card {
+  position: absolute;
+  z-index: 4;
+  top: 18%;
+  width: 260px;
+  padding: 17px 18px;
+  border: 4px solid rgba(255,247,220,.95);
+  border-radius: 22px;
+  background: rgba(24, 54, 71, .88);
+  box-shadow: 0 7px 0 rgba(8, 28, 38, .35), inset 0 0 30px rgba(255,255,255,.04);
+  backdrop-filter: blur(8px);
+}
+.mission-card { left: 2.2%; }
+.event-card { right: 2.2%; }
+.eyebrow { display: block; margin-bottom: 7px; color: var(--gold); font-size: 11px; font-weight: 900; letter-spacing: .15em; }
+.mission-card > strong { font: 800 20px/1.15 'Baloo 2'; }
+.goal-row, .charge-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 9px; font-size: 12px; }
+.goal-row b { color: #bdf789; }
+.mission-card .goal-track { height: 14px; margin-top: 7px; padding: 3px; background: #102c3a; }
+.goal-track span { background: linear-gradient(90deg, #68da6f, #c6f470); }
+.charge-row { margin: 13px -18px -17px; padding: 10px 18px; border-radius: 0 0 17px 17px; background: rgba(5,24,33,.38); }
+.charge-row b { color: #83dfff; font-style: normal; }
+.charge-row i:last-child { color: #ff8d9d; }
+
+.event-card { min-height: 218px; }
+.event-card ol { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.event-card li { position: relative; padding-left: 12px; border-left: 4px solid var(--gold); animation: event-in .35s ease-out; }
+.event-card li b, .event-card li span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-card li b { font: 800 14px/1.2 'Nunito'; }
+.event-card li span { margin-top: 2px; color: #c6dae4; font-size: 11px; }
+
+.how-to-play {
+  position: absolute;
+  z-index: 6;
+  left: 2.2%;
+  right: 2.2%;
+  bottom: 2.5%;
+  height: 108px;
+  display: grid;
+  grid-template-columns: 1fr 2fr .85fr;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 20px;
+  color: var(--ink);
+  border: 5px solid #fff7dc;
+  border-radius: 28px;
+  background: rgba(255, 250, 226, .96);
+  box-shadow: 0 8px 0 rgba(8, 31, 42, .32), inset 0 -4px rgba(56, 43, 29, .08);
+}
+.join-callout, .energy-tip { display: flex; align-items: center; gap: 12px; }
+.chat-bubble, .energy-tip > span { display: grid; place-items: center; flex: 0 0 58px; width: 58px; height: 58px; border-radius: 18px; background: var(--gold); font-size: 29px; box-shadow: inset 0 -5px rgba(151,100,19,.16); }
+.join-callout p, .energy-tip p { margin: 0; }
+.join-callout small, .energy-tip strong { display: block; color: #697984; font-size: 10px; letter-spacing: .14em; }
+.join-callout strong { display: block; font: 800 clamp(17px, 1.4vw, 25px)/1.1 'Baloo 2'; white-space: nowrap; }
+.join-callout em { color: var(--blue-dark); font-style: normal; }
+.join-callout em:last-child { color: var(--red-dark); }
+.commands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.commands > div { position: relative; min-width: 0; padding: 8px 34px 8px 11px; border: 2px solid #d5cfb6; border-radius: 13px; background: #f2ead1; }
+.commands kbd, .commands span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commands kbd { font: 900 14px/1.1 'Nunito'; color: #244b60; }
+.commands span { margin-top: 3px; color: #75818a; font-size: 10px; }
+.commands b { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #c68100; font-size: 12px; }
+.energy-tip > span { background: #dff37a; }
+.energy-tip small { display: block; margin-top: 3px; color: #74828a; font-size: 11px; }
+
+.connection { position: absolute; z-index: 8; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: rgba(15,39,50,.75); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.connection i { width: 8px; height: 8px; border-radius: 50%; background: #ffca51; }
+.connection.online i { background: #7ce879; box-shadow: 0 0 9px #7ce879; }
+.winner { position: absolute; z-index: 12; inset: 0; display: none; place-content: center; text-align: center; background: rgba(12, 33, 44, .72); backdrop-filter: blur(9px); }
+.winner.show { display: grid; animation: winner-in .5s ease-out; }
+.winner small { color: var(--gold); font-weight: 900; letter-spacing: .25em; }
+.winner strong { font: 800 72px/1 'Baloo 2'; text-shadow: 0 7px rgba(0,0,0,.25); }
+.winner span { font-size: 80px; }
+
+@keyframes event-in { from { opacity: 0; transform: translateX(15px); } }
+@keyframes winner-in { from { opacity: 0; transform: scale(1.05); } }
+@keyframes clock-pulse { 50% { transform: scale(1.04); } }
+
+@media (max-aspect-ratio: 16/10) {
+  .mission-card, .event-card { top: 20%; transform: scale(.9); }
+  .mission-card { transform-origin: left top; }
+  .event-card { transform-origin: right top; }
+}

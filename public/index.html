@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guerra da Live</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="arena" aria-label="Arena da batalha entre os times azul e vermelho"></canvas>
+    <div class="vignette"></div>
+
+    <header class="scoreboard">
+      <section class="king-card blue" aria-label="Vida do Rei Azul">
+        <div class="king-copy"><span class="team-name">REINO AZUL</span><strong id="blue-hp">1.000 HP</strong></div>
+        <div class="hp-track"><span id="blue-hp-bar"></span></div>
+        <span class="shield" id="blue-shield">ESCUDO 0</span>
+      </section>
+      <section class="clock-card">
+        <span id="phase">BATALHA</span>
+        <strong id="clock">05:00</strong>
+        <small>GUERRA DA LIVE</small>
+      </section>
+      <section class="king-card red" aria-label="Vida do Rei Vermelho">
+        <div class="king-copy"><span class="team-name">REINO VERMELHO</span><strong id="red-hp">1.000 HP</strong></div>
+        <div class="hp-track"><span id="red-hp-bar"></span></div>
+        <span class="shield" id="red-shield">ESCUDO 0</span>
+      </section>
+    </header>
+
+    <aside class="mission-card">
+      <span class="eyebrow">PRÓXIMA META</span>
+      <strong id="goal-title">Cura do time azul</strong>
+      <div class="goal-row"><span id="goal-copy">0 / 200 curtidas</span><b id="goal-left">faltam 200</b></div>
+      <div class="goal-track"><span id="goal-bar"></span></div>
+      <div class="charge-row"><span>🌹 Cargas táticas</span><b><i id="blue-charge">0</i> × <i id="red-charge">0</i></b></div>
+    </aside>
+
+    <aside class="event-card">
+      <span class="eyebrow">ACONTECEU AGORA</span>
+      <ol id="event-feed"><li><b>Arena pronta!</b><span>Digite !entrar para jogar</span></li></ol>
+    </aside>
+
+    <section class="how-to-play">
+      <div class="join-callout"><span class="chat-bubble">!</span><p><small>PARA JOGAR</small><strong>!entrar <em>azul</em> ou <em>vermelho</em></strong></p></div>
+      <div class="commands">
+        <div><kbd>!atacar</kbd><span>Golpe no rei</span><b>⚡ 2</b></div>
+        <div><kbd>!defender</kbd><span>Escudo +30</span><b>⚡ 2</b></div>
+        <div><kbd>!curar</kbd><span>Recupera 50 HP</span><b>⚡ 3</b></div>
+      </div>
+      <div class="energy-tip"><span>⚡</span><p><strong>GANHE ENERGIA</strong><small>+1 a cada 25 curtidas</small></p></div>
+    </section>
+
+    <div class="connection" id="connection"><i></i><span>conectando à arena</span></div>
+    <section class="winner" id="winner"><small>VITÓRIA DO</small><strong id="winner-team">TIME AZUL</strong><span>👑</span></section>
+  </main>
+  <script type="module" src="/arena.js"></script>
+</body>
+</html>

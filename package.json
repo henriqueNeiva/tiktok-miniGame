@@ -11,6 +11,8 @@
     "check": "tsc --noEmit",
     "simulate": "npm run build && node dist/src/main.js simulate",
     "live": "npm run build && node dist/src/main.js live",
+    "arena": "npm run build && node dist/src/main.js arena",
+    "arena:demo": "npm run build && node dist/src/main.js arena --demo",
     "start": "node dist/src/main.js",
     "test": "npm run build && node --test dist/test/*.test.js"
   },

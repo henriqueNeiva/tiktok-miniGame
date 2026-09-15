@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { TikTokAdapter } from '../src/infrastructure/tiktok-adapter.js';
 import { createInterpreter } from '../src/application/handle-live-event.js';
 import { simulate } from '../src/infrastructure/simulation.js';
-import { INITIAL_KING_HP, LIKE_ATTACK_DAMAGE, MatchState } from '../src/domain/match-state.js';
+import { INITIAL_KING_HP, LIKE_ATTACK_DAMAGE, MatchState, MAX_PLAYER_ENERGY } from '../src/domain/match-state.js';
 import type { LiveEvent } from '../src/domain/events.js';
 import type { Log } from '../src/application/ports.js';
 
@@ -145,6 +145,20 @@ test('exact commands normalized, arbitrary comments ignored, chat replay filtere
   assert.equal(commands.length, 1);
   assert.equal(commands[0]?.fields.team, 'azul');
   assert.equal(logs.filter(l => l.stage === 'COMMENT_IGNORED').length, 2);
+});
+test('free likes recharge energy used by attack, defense and heal commands', () => {
+  const logs: { stage: string; fields: Record<string, unknown> }[] = [];
+  const handle = createInterpreter((stage, fields) => logs.push({ stage, fields }));
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!entrar azul' });
+  handle({ source: 'simulation', type: 'LIKE_RECEIVED', user: 'joao', count: 75, total: '75' });
+  assert.equal(handle.snapshot().players[0]?.energy, MAX_PLAYER_ENERGY);
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!atacar' });
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!defender' });
+  assert.equal(handle.snapshot().players[0]?.energy, 1);
+  assert.equal(handle.snapshot().kingShield.azul, 30);
+  assert.ok(logs.some(log => log.stage === 'DAMAGE_APPLIED' && log.fields.user === 'joao'));
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!curar' });
+  assert.ok(logs.some(log => log.stage === 'COMMENT_IGNORED' && log.fields.reason === 'insufficient_energy'));
 });
 test('live CLI without username fails before any connection', () => {
   const result = spawnSync(process.execPath, ['dist/src/main.js', 'live'], {
