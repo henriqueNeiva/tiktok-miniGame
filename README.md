@@ -189,20 +189,22 @@ npm run arena:demo
 
 Abra `http://localhost:3000`. No OBS, adicione essa URL como Browser Source em proporção 16:9 (por exemplo, 1600 × 900 ou 1920 × 1080).
 
-Para usar a mesma arena com uma live real:
+Para usar a arena com a live real, este é o comando principal:
 
 ```powershell
-npm run arena -- @nome_do_perfil
+npm run live -- @nome_do_perfil
 ```
 
-A porta padrão é 3000 e pode ser alterada pela variável `ARENA_PORT`. O servidor transmite apenas estado e eventos locais por SSE; o navegador não se conecta diretamente ao TikTok.
+A porta padrão é 3000 e pode ser alterada pela variável `ARENA_PORT`. Em seguida, abra `http://localhost:3000` no navegador ou como Browser Source no OBS. O servidor transmite apenas estado e eventos locais por SSE; o navegador não se conecta diretamente ao TikTok.
 
-### Conectar à live real
+`npm run arena -- @nome_do_perfil` continua como alias compatível. Para executar somente os logs técnicos, sem abrir a arena, use `npm run logs -- @nome_do_perfil`.
+
+### Conectar à live real sem overlay
 
 Com o perfil transmitindo ao vivo:
 
 ```powershell
-npm run live -- @nome_do_perfil
+npm run logs -- @nome_do_perfil
 ```
 
 Alternativa: `$env:TIKTOK_USERNAME = 'nome_do_perfil'` e `npm run live`. Após build: `npm start -- live @nome_do_perfil`. Ctrl+C encerra. `.env` não é carregado automaticamente.

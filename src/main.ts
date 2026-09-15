@@ -12,7 +12,7 @@ async function runArena(): Promise<void> {
   let username: string | undefined;
   if (!demo) {
     try { username = readUsername(process.argv[3], process.env.TIKTOK_USERNAME); } catch {
-      createLog('tiktok')('CONFIG_ERROR', { message: 'Informe o @perfil: npm run arena -- @perfil (ou use npm run arena:demo)' });
+      createLog('tiktok')('CONFIG_ERROR', { message: 'Informe o @perfil: npm run live -- @perfil (ou use npm run arena:demo)' });
       process.exitCode = 1;
       return;
     }
@@ -42,13 +42,13 @@ async function runArena(): Promise<void> {
 }
 
 const mode = process.argv[2];
-if (mode !== 'simulate' && mode !== 'live' && mode !== 'arena') {
-  console.error('Uso: npm run simulate | npm run live -- @perfil | npm run arena -- @perfil | npm run arena:demo');
+if (mode !== 'simulate' && mode !== 'live' && mode !== 'arena' && mode !== 'logs') {
+  console.error('Uso: npm run simulate | npm run live -- @perfil | npm run logs -- @perfil | npm run arena:demo');
   process.exitCode = 1;
-} else if (mode === 'arena') {
+} else if (mode === 'live' || mode === 'arena') {
   await runArena();
 } else {
-  const source = mode === 'live' ? 'tiktok' : 'simulation';
+  const source = mode === 'logs' ? 'tiktok' : 'simulation';
   const log = createLog(source);
   const adapter = new TikTokAdapter(source, createInterpreter(log), log);
   if (mode === 'simulate') {
@@ -58,7 +58,7 @@ if (mode !== 'simulate' && mode !== 'live' && mode !== 'arena') {
   } else {
     let username: string | undefined;
     try { username = readUsername(process.argv[3], process.env.TIKTOK_USERNAME); } catch {
-      log('CONFIG_ERROR', { message: 'Informe o @perfil que está ao vivo: npm run live -- @perfil' });
+      log('CONFIG_ERROR', { message: 'Informe o @perfil que está ao vivo: npm run logs -- @perfil' });
       process.exitCode = 1;
     }
     if (username) {
