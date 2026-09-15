@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { TikTokAdapter } from '../src/infrastructure/tiktok-adapter.js';
 import { createInterpreter } from '../src/application/handle-live-event.js';
 import { simulate } from '../src/infrastructure/simulation.js';
-import { INITIAL_KING_HP, LIKE_ATTACK_DAMAGE, MatchState, MAX_PLAYER_ENERGY } from '../src/domain/match-state.js';
+import { INITIAL_KING_HP, LIKE_ATTACK_DAMAGE, MatchState, MAX_PLAYER_ENERGY, MAX_TIME_ADVANCE_SECONDS } from '../src/domain/match-state.js';
 import type { LiveEvent } from '../src/domain/events.js';
 import type { Log } from '../src/application/ports.js';
 
@@ -112,8 +112,41 @@ test('match timer finishes after five minutes and exposes ranking profile', () =
   const snapshot = match.advanceTime(1);
   assert.equal(snapshot.phase, 'FINISHED');
   assert.equal(snapshot.remainingSeconds, 0);
+  assert.equal(snapshot.nextRoundInSeconds, 30);
   assert.equal(match.ranking()[0]?.user, 'joao');
   assert.equal(match.profileOf('joao')?.level, 1);
+});
+test('next round starts after thirty seconds and keeps players on their teams', () => {
+  const match = new MatchState();
+  match.join('joao', 'azul', () => 0);
+  match.join('maria', 'vermelho', () => 0);
+  match.recordLikes('joao', 100, '100');
+  match.applyAttack('azul', INITIAL_KING_HP);
+  assert.equal(match.snapshot().phase, 'FINISHED');
+  assert.equal(match.advanceTime(29).nextRoundInSeconds, 1);
+  const nextRound = match.advanceTime(2);
+  assert.equal(nextRound.phase, 'ACTIVE');
+  assert.equal(nextRound.round, 2);
+  assert.equal(nextRound.remainingSeconds, 299);
+  assert.equal(nextRound.kingHp.azul, INITIAL_KING_HP);
+  assert.equal(nextRound.kingHp.vermelho, INITIAL_KING_HP);
+  assert.equal(nextRound.players.find(player => player.user === 'joao')?.team, 'azul');
+  assert.equal(nextRound.players.find(player => player.user === 'maria')?.team, 'vermelho');
+});
+test('round break ignores interactions and rejects unreasonable clock jumps', () => {
+  const logs: { stage: string; fields: Record<string, unknown> }[] = [];
+  const handle = createInterpreter((stage, fields) => logs.push({ stage, fields }));
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!entrar azul' });
+  handle.advanceTime(300);
+  handle({ source: 'simulation', type: 'LIKE_RECEIVED', user: 'joao', count: 100, total: '100' });
+  handle({ source: 'simulation', type: 'GIFT_RECEIVED', user: 'joao', giftId: '5655', giftName: 'Rose', quantity: 1 });
+  handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!atacar' });
+  const breakSnapshot = handle.snapshot();
+  assert.equal(breakSnapshot.teamLikes.azul, 0);
+  assert.equal(breakSnapshot.tacticalCharges.azul, 0);
+  assert.equal(logs.filter(log => log.stage === 'EVENT_IGNORED' && log.fields.reason === 'round_break').length, 2);
+  assert.ok(logs.some(log => log.stage === 'COMMENT_IGNORED' && log.fields.reason === 'round_break'));
+  assert.throws(() => handle.advanceTime(MAX_TIME_ADVANCE_SECONDS + 1), RangeError);
 });
 test('rose creates a tactical charge for the player team without direct damage', () => {
   const logs: { stage: string; fields: Record<string, unknown> }[] = [];

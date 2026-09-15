@@ -4,6 +4,7 @@ const elements = Object.fromEntries([
   'blue-hp', 'red-hp', 'blue-hp-bar', 'red-hp-bar', 'blue-shield', 'red-shield',
   'clock', 'phase', 'goal-title', 'goal-copy', 'goal-left', 'goal-bar',
   'blue-charge', 'red-charge', 'event-feed', 'connection', 'winner', 'winner-team',
+  'winner-kicker', 'next-round', 'round-label',
 ].map(id => [id, document.getElementById(id)]));
 
 const teamColor = { azul: '#26aef3', vermelho: '#f34f68' };
@@ -16,6 +17,9 @@ let snapshot = {
   teamLikes: { azul: 0, vermelho: 0 }, tacticalCharges: { azul: 0, vermelho: 0 }, players: [],
 };
 let size = { width: 1600, height: 900, dpr: 1 };
+
+function isPortrait() { return size.height >= size.width * 1.25; }
+function battleCenterY() { return size.height * (isPortrait() ? .56 : .5); }
 
 function resize() {
   const box = canvas.getBoundingClientRect();
@@ -76,8 +80,10 @@ function drawBackground(time) {
   }
   context.restore();
 
-  for (const bridgeY of [height * .34, height * .62]) drawBridge(width / 2, bridgeY, riverWidth + 35);
-  drawCenterCrest(width / 2, height * .49);
+  const centerY = battleCenterY();
+  const bridgeOffset = height * (isPortrait() ? .105 : .14);
+  for (const bridgeY of [centerY - bridgeOffset, centerY + bridgeOffset]) drawBridge(width / 2, bridgeY, riverWidth + 35);
+  drawCenterCrest(width / 2, centerY);
 }
 
 function drawBridge(x, y, width) {
@@ -107,9 +113,10 @@ function drawCenterCrest(x, y) {
 function drawCastle(team, time) {
   const { width, height } = size;
   const blue = team === 'azul';
-  const x = blue ? width * .095 : width * .905;
-  const y = height * .5;
-  const scale = Math.max(.75, Math.min(1.15, width / 1500));
+  const portrait = isPortrait();
+  const x = blue ? width * (portrait ? .12 : .095) : width * (portrait ? .88 : .905);
+  const y = battleCenterY();
+  const scale = portrait ? Math.min(1.3, width / 800) : Math.max(.75, Math.min(1.15, width / 1500));
   context.save();
   context.translate(x, y + Math.sin(time * .002 + (blue ? 0 : 1)) * 2);
   context.scale(scale, scale);
@@ -139,14 +146,15 @@ function playerPosition(team, index, count) {
   const { width, height } = size;
   const blue = team === 'azul';
   const visibleCount = Math.min(count, 8);
-  const columns = visibleCount > 4 ? 2 : 1;
+  const portrait = isPortrait();
+  const columns = portrait ? (visibleCount > 2 ? 2 : 1) : (visibleCount > 4 ? 2 : 1);
   const row = Math.floor(index / columns);
   const column = index % columns;
-  const xBase = blue ? width * .25 : width * .75;
-  const x = xBase + (blue ? 1 : -1) * column * width * .075;
+  const xBase = blue ? width * (portrait ? .3 : .25) : width * (portrait ? .7 : .75);
+  const x = xBase + (blue ? 1 : -1) * column * width * (portrait ? .12 : .075);
   const rows = Math.ceil(visibleCount / columns);
-  const spacing = Math.min(105, height * .105);
-  const y = height * .5 + (row - (rows - 1) / 2) * spacing;
+  const spacing = portrait ? Math.min(145, height * .08) : Math.min(105, height * .105);
+  const y = battleCenterY() + (row - (rows - 1) / 2) * spacing;
   return { x, y };
 }
 
@@ -155,7 +163,7 @@ function drawPlayers(team, time) {
   const players = all.slice(0, 8);
   players.forEach((player, index) => {
     const { x, y } = playerPosition(team, index, players.length);
-    const radius = Math.max(27, Math.min(38, size.width * .022));
+    const radius = isPortrait() ? Math.max(48, Math.min(58, size.width * .052)) : Math.max(27, Math.min(38, size.width * .022));
     context.save();
     context.translate(x, y + Math.sin(time * .004 + index) * 3);
     context.fillStyle = 'rgba(8,36,42,.2)';
@@ -166,21 +174,24 @@ function drawPlayers(team, time) {
     drawAvatar(player.user, radius);
     context.fillStyle = '#183647'; context.strokeStyle = '#fff7dc'; context.lineWidth = 5;
     roundedRect(-radius - 9, radius + 4, radius * 2 + 18, 25, 9); context.stroke(); context.fill();
-    context.fillStyle = '#fff'; context.font = '800 12px Nunito, sans-serif';
+    context.fillStyle = '#fff'; context.font = `800 ${isPortrait() ? 22 : 12}px Nunito, sans-serif`;
     context.fillText(`@${shortName(player.user)}`, 0, radius + 17);
     context.fillStyle = '#ffd456'; context.strokeStyle = '#fff7dc'; context.lineWidth = 3;
-    context.beginPath(); context.arc(-radius + 2, -radius + 2, 15, 0, Math.PI * 2); context.fill(); context.stroke();
-    context.fillStyle = '#5b4417'; context.font = '900 10px Nunito, sans-serif'; context.fillText(`Nv${player.level}`, -radius + 2, -radius + 2);
+    const badgeRadius = isPortrait() ? 21 : 15;
+    context.beginPath(); context.arc(-radius + 2, -radius + 2, badgeRadius, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#5b4417'; context.font = `900 ${isPortrait() ? 14 : 10}px Nunito, sans-serif`; context.fillText(`Nv${player.level}`, -radius + 2, -radius + 2);
     context.fillStyle = '#dff37a'; context.strokeStyle = '#fff7dc'; context.lineWidth = 3;
-    context.beginPath(); context.arc(radius - 2, -radius + 2, 15, 0, Math.PI * 2); context.fill(); context.stroke();
-    context.fillStyle = '#405016'; context.font = '900 10px Nunito, sans-serif'; context.fillText(`E${player.energy}`, radius - 2, -radius + 2);
+    context.beginPath(); context.arc(radius - 2, -radius + 2, badgeRadius, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#405016'; context.font = `900 ${isPortrait() ? 14 : 10}px Nunito, sans-serif`; context.fillText(`E${player.energy}`, radius - 2, -radius + 2);
     context.restore();
   });
   if (all.length > 8) {
     const blue = team === 'azul';
     context.fillStyle = '#fff7dc'; context.strokeStyle = teamColor[team]; context.lineWidth = 5;
-    context.beginPath(); context.arc(blue ? size.width * .39 : size.width * .61, size.height * .74, 28, 0, Math.PI * 2); context.fill(); context.stroke();
-    context.fillStyle = teamDark[team]; context.font = '900 15px Nunito'; context.textAlign = 'center'; context.fillText(`+${all.length - 8}`, blue ? size.width * .39 : size.width * .61, size.height * .745);
+    const groupX = blue ? size.width * .39 : size.width * .61;
+    const groupY = isPortrait() ? battleCenterY() + size.height * .17 : size.height * .74;
+    context.beginPath(); context.arc(groupX, groupY, 28, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = teamDark[team]; context.font = '900 15px Nunito'; context.textAlign = 'center'; context.fillText(`+${all.length - 8}`, groupX, groupY + 2);
   }
 }
 
@@ -209,21 +220,22 @@ function drawEffects(now) {
     context.save();
     const blue = effect.team === 'azul';
     if (effect.kind === 'attack') {
-      const from = { x: blue ? size.width * .33 : size.width * .67, y: size.height * .5 };
-      const to = { x: blue ? size.width * .88 : size.width * .12, y: size.height * .5 };
+      const from = { x: blue ? size.width * .35 : size.width * .65, y: battleCenterY() };
+      const to = { x: blue ? size.width * .88 : size.width * .12, y: battleCenterY() };
       const eased = 1 - (1 - progress) ** 3;
       const x = from.x + (to.x - from.x) * eased;
-      const y = from.y + (to.y - from.y) * eased - Math.sin(progress * Math.PI) * size.height * .15;
+      const arcHeight = isPortrait() ? size.width * .18 : size.height * .15;
+      const y = from.y + (to.y - from.y) * eased - Math.sin(progress * Math.PI) * arcHeight;
       context.shadowBlur = 22; context.shadowColor = teamColor[effect.team];
       context.fillStyle = '#fff7aa'; context.beginPath(); context.arc(x, y, 12 + Math.sin(progress * 20) * 3, 0, Math.PI * 2); context.fill();
       context.fillStyle = teamColor[effect.team]; context.globalAlpha = .6;
       context.beginPath(); context.arc(x - (blue ? 18 : -18), y + 7, 18, 0, Math.PI * 2); context.fill();
     } else {
-      const x = blue ? size.width * .1 : size.width * .9;
+      const x = blue ? size.width * (isPortrait() ? .12 : .1) : size.width * (isPortrait() ? .88 : .9);
       context.strokeStyle = effect.kind === 'heal' ? '#8aff95' : '#b9f2ff';
       context.lineWidth = 8; context.globalAlpha = 1 - progress;
-      context.beginPath(); context.arc(x, size.height * .5, 85 + progress * 80, 0, Math.PI * 2); context.stroke();
-      context.font = '42px sans-serif'; context.textAlign = 'center'; context.fillText(effect.kind === 'heal' ? '💚' : '🛡️', x, size.height * .42 - progress * 35);
+      context.beginPath(); context.arc(x, battleCenterY(), 85 + progress * 80, 0, Math.PI * 2); context.stroke();
+      context.font = '42px sans-serif'; context.textAlign = 'center'; context.fillText(effect.kind === 'heal' ? '💚' : '🛡️', x, battleCenterY() - 70 - progress * 35);
     }
     context.restore();
   }
@@ -237,10 +249,12 @@ function updateHud() {
   elements['red-hp-bar'].style.width = `${hp.vermelho / 10}%`;
   elements['blue-shield'].textContent = `ESCUDO ${snapshot.kingShield?.azul ?? 0}`;
   elements['red-shield'].textContent = `ESCUDO ${snapshot.kingShield?.vermelho ?? 0}`;
-  const minutes = Math.floor(snapshot.remainingSeconds / 60);
-  const seconds = snapshot.remainingSeconds % 60;
+  const displayedSeconds = snapshot.phase === 'FINISHED' ? snapshot.nextRoundInSeconds ?? 30 : snapshot.remainingSeconds;
+  const minutes = Math.floor(displayedSeconds / 60);
+  const seconds = displayedSeconds % 60;
   elements.clock.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  elements.phase.textContent = snapshot.phase === 'LOBBY' ? 'PREPARE-SE' : snapshot.phase === 'FINISHED' ? 'FIM DE JOGO' : 'BATALHA';
+  elements.phase.textContent = snapshot.phase === 'LOBBY' ? 'PREPARE-SE' : snapshot.phase === 'FINISHED' ? 'PRÓXIMA' : 'BATALHA';
+  elements['round-label'].textContent = `RODADA ${snapshot.round ?? 1}`;
   document.querySelector('.clock-card').classList.toggle('climax', snapshot.remainingSeconds <= 40 && snapshot.phase === 'ACTIVE');
   const blueProgress = snapshot.teamLikes.azul % 200;
   const redProgress = snapshot.teamLikes.vermelho % 200;
@@ -252,9 +266,13 @@ function updateHud() {
   elements['goal-bar'].style.width = `${progress / 2}%`;
   elements['blue-charge'].textContent = snapshot.tacticalCharges.azul;
   elements['red-charge'].textContent = snapshot.tacticalCharges.vermelho;
-  if (snapshot.phase === 'FINISHED' && snapshot.winner) {
-    elements['winner-team'].textContent = `TIME ${snapshot.winner.toUpperCase()}`;
+  if (snapshot.phase === 'FINISHED') {
+    elements['winner-kicker'].textContent = snapshot.winner ? 'VITÓRIA DO' : 'FIM DE RODADA';
+    elements['winner-team'].textContent = snapshot.winner ? `TIME ${snapshot.winner.toUpperCase()}` : 'EMPATE';
+    elements['next-round'].textContent = `Próxima rodada em ${snapshot.nextRoundInSeconds ?? 30}s`;
     elements.winner.classList.add('show');
+  } else {
+    elements.winner.classList.remove('show');
   }
 }
 

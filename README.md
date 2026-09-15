@@ -24,6 +24,7 @@ Estas regras foram definidas antes da próxima implementação. O objetivo é ma
 - Se um rei chegar a zero, o outro time vence imediatamente.
 - Se o tempo acabar, vence o time cujo rei tiver mais HP. Em empate, vence o time com mais pontos; persistindo o empate, vence o time com maior participação válida.
 - A partida entra em `LOBBY`, `ACTIVE` e `FINISHED`. A próxima partida só começa após o resultado ser exibido.
+- Ao terminar, o resultado permanece por **30 segundos**. Likes, gifts e comandos de combate são ignorados nesse intervalo. A rodada seguinte começa automaticamente com os mesmos jogadores nos respectivos times; HP, escudos, metas, cargas, energia e pontuação da rodada são reiniciados, enquanto XP e nível permanecem.
 
 ### Participação gratuita
 
@@ -138,7 +139,7 @@ Comandos administrativos futuros:
 - `src/infrastructure/tiktok-adapter.ts`: validação e normalização TikTok → `COMMENT` / `LIKE_RECEIVED` / `GIFT_RECEIVED`. Curtidas informam `count` por pacote e o interpretador usa o `total` acumulado do TikTok quando disponível, com fallback para soma local. Combos tipo 1 geram logs de progresso e só produzem evento interno quando `repeatEnd=1` (ou `true`). Contagem final é acumulada, não soma dos parciais. Sem final, não há crédito presumido.
 - Deduplicação em memória dos últimos 10.000 IDs: grupo+usuário+gift para combo, ID de mensagem nos demais casos. Sem identificador, avisa `DEDUP_UNAVAILABLE`; não garante exatamente uma entrega, nem recuperação após reinício.
 - `src/application/handle-live-event.ts`: `!entrar azul` e `!entrar vermelho` entram no time solicitado; `!entrar` escolhe aleatoriamente quando há empate e escolhe o time menor quando há desequilíbrio. O estado de jogadores fica em memória e uma segunda entrada do mesmo usuário é ignorada. A próxima regra de controle será restringir o início ao `!iniciar` do perfil administrador.
-- `src/application/handle-live-event.ts`: curtidas geram `LIKE_ACKNOWLEDGED` com acumulado da sessão; `!entrar azul` e `!entrar vermelho` escolhem o time explicitamente, enquanto `!entrar` equilibra os times (aleatório no empate). Os demais comandos continuam exatos e sem argumentos. As regras de timer, XP, ranking e Gifts do MVP-0.2 estão definidas acima, mas ainda não implementadas.
+- `src/application/handle-live-event.ts`: curtidas geram `LIKE_ACKNOWLEDGED` com acumulado da sessão; `!entrar azul` e `!entrar vermelho` escolhem o time explicitamente, enquanto `!entrar` equilibra os times (aleatório no empate). Timer, XP, ranking, Gifts, energia e comandos básicos do MVP-0.2 estão implementados e cobertos pelos testes; cooldowns e persistência global continuam planejados.
 - `src/domain/match-state.ts`: estado em memória de jogadores, times, curtidas individuais e por time. Cada 100 curtidas pessoais de um jogador já inscrito dispara `RULE_TRIGGERED` com ação `PLAYER_ATTACK`; curtidas sem time não entram no placar de equipe nem disparam ataque.
 - `src/domain/match-state.ts`: cada rei começa com `1.000 HP`; `PLAYER_ATTACK` causa `10 + bônus de nível` no rei adversário, limitado a `+5`, e o HP nunca fica abaixo de zero. O domínio controla fases, cronômetro de 300 segundos, metas de cura, ataque coletivo, XP, nível e ranking. O interpretador registra `DAMAGE_APPLIED` e `KING_DEFEATED` quando aplicável.
 - `src/domain/match-state.ts`: snapshots incluem jogadores, nível, energia, HP, escudos, curtidas e cargas táticas. Ataque, defesa e cura gastam energia obtida gratuitamente pelas curtidas.
@@ -147,7 +148,7 @@ Comandos administrativos futuros:
 - `src/domain/events.ts`: tipos internos puros. `src/application/ports.ts`: portas funcionais `Log` e `HandleLiveEvent`. `src/infrastructure/console-log.ts`: implementação JSON por linha com horário, origem e etapa. `RESULT` contém resposta observável e contadores da sessão. Sem cooldown nesta fase de confirmação em logs.
 - `src/infrastructure/simulation.ts`: fixtures que atravessam o mesmo adaptador e interpretador. `src/config/config.ts`: validação do perfil. `src/main.ts`: composição/CLI. `test/`: testes automatizados.
 - `src/infrastructure/tiktok-live.ts`: registra listeners de chat, gifts e likes no conector real. `src/infrastructure/simulation.ts`: fixtures que atravessam o mesmo adaptador e interpretador. `src/config/config.ts`: validação do perfil. `src/main.ts`: composição/CLI. `test/`: testes automatizados.
-- `npm test` (inclui build): **19 testes aprovados, zero falhas** após incluir ciclo da partida, XP, ranking, metas, cargas e energia/comandos.
+- `npm test` (inclui build): **21 testes aprovados, zero falhas** após incluir ciclo automático de rodadas, XP, ranking, metas, cargas e energia/comandos.
 - Atenção à divergência do README upstream: o schema v3 publicado em 2.4.4 usa `user.displayId`, comentário `content`, `gift.type`, `gift.name` e `repeatEnd` numérico. Implementação lê esses campos e tolera aliases anteriores. Testes de aceitação verificam os campos contra as tipagens instaladas. Há adaptação tipada de `on` apenas na fronteira do SDK devido ao `typed-emitter` publicado com import incompatível com NodeNext; inicialização e método real foram verificados sem conexão.
 - Execução usa TypeScript compilado + test runner nativo Node. `tsx` foi removido após falha de `os.userInfo` no sandbox Windows; não é necessário para executar o projeto.
 - `enableExtendedGiftInfo: false`: consulta extra ao catálogo de presentes exigiu assinatura Business no teste real. A POC utiliza os campos dos próprios eventos (`gift.type/name`) e fallback de nome por ID; conexão básica funcionou com catálogo desativado, sem configurar nova chave.
@@ -187,7 +188,10 @@ Para conferir o visual com jogadores e interações sintéticas, sem acessar o T
 npm run arena:demo
 ```
 
-Abra `http://localhost:3000`. No OBS, adicione essa URL como Browser Source em proporção 16:9 (por exemplo, 1600 × 900 ou 1920 × 1080).
+Abra `http://localhost:3000`. Adicione essa URL diretamente como Browser Source; não capture a área de trabalho, as abas do navegador ou o editor.
+
+- Para a TikTok LIVE vista pelo celular, use uma cena **vertical 1080 × 1920 (9:16)**. A arena muda automaticamente para o layout mobile, com textos e unidades maiores dentro da área segura.
+- O layout horizontal 1920 × 1080 (16:9) continua disponível para transmissão em PC. O TikTok reduz uma cena horizontal a uma faixa pequena no celular, por isso ela não deve ser usada como saída principal da live vertical.
 
 Para usar a arena com a live real, este é o comando principal:
 
@@ -218,8 +222,9 @@ Esperar `CONNECTED` com roomId; de outro espectador, comentar `!entrar azul`, `!
 - Lidos os dois documentos de planejamento e confirmado escopo restrito.
 - Consultada documentação primária atual e instalado conector 2.4.4 com dependências fixadas. Instalação informou zero vulnerabilidades.
 - Implementados normalização, interpretação, logs, simulação e entrada real.
-- `npm run check`: aprovado. `npm test` (inclui build): **19 testes aprovados, zero falhas**. Casos de uso testados diretamente com porta de log em memória e com adaptador simulado.
+- `npm run check`: aprovado. `npm test` (inclui build): **21 testes aprovados, zero falhas**. Casos de uso testados diretamente com porta de log em memória e com adaptador simulado.
 - `npm run arena:demo`: servidor respondeu em `/health` e a página carregou em 1600 × 900 sem erros no console do navegador. Foram conferidos HUD, personagens, meta, energia, comandos, feed e efeitos via SSE.
+- Layout vertical validado em 1080 × 1920: placar e instruções ficam abaixo dos controles superiores do TikTok, jogadores ocupam duas colunas por time e a região inferior permanece livre para comentários.
 - `npm run simulate`: aprovado, dois comandos aceitos e total de cinco presentes; final repetido ignorado. Build impede emissão em caso de erro.
 - Importação, construção do SDK e `disconnect()` local: aprovados, sem chamar `connect()`. Construtor precisa de objeto de opções nesta versão; implementação o fornece.
 - **Primeira tentativa real em 15/09/2026, 12:37 (São Paulo):** usuário informou que abriu a live; arroba recebido por voz foi interpretado provisoriamente como `henrique_santos`. Executado `npm run live -- henrique_santos`. Build aprovado; `CONNECTING` às 15:37:38 UTC seguido de `CONNECT_FAILED` às 15:37:39 UTC: `Failed to retrieve Room ID from all sources.` Processo encerrou com código 1, sem `CONNECTED` ou eventos reais.

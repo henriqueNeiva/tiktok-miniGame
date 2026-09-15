@@ -2,6 +2,8 @@ export type Team = 'azul' | 'vermelho';
 export const INITIAL_KING_HP = 1_000;
 export const LIKE_ATTACK_DAMAGE = 10;
 export const MATCH_DURATION_SECONDS = 5 * 60;
+export const NEXT_ROUND_DELAY_SECONDS = 30;
+export const MAX_TIME_ADVANCE_SECONDS = 60 * 60;
 export const TEAM_HEAL_THRESHOLD = 200;
 export const TEAM_HEAL_AMOUNT = 50;
 export const TEAM_ATTACK_THRESHOLD = 500;
@@ -63,8 +65,10 @@ export type GiftUpdate = {
 
 export type MatchSnapshot = {
   phase: MatchPhase;
+  round: number;
   elapsedSeconds: number;
   remainingSeconds: number;
+  nextRoundInSeconds?: number;
   winner?: Team;
   kingHp: Record<Team, number>;
   teamLikes: Record<Team, number>;
@@ -86,7 +90,9 @@ export class MatchState {
   private readonly profiles = new Map<string, PlayerProfile>();
   private totalLikes = 0;
   private phase: MatchPhase = 'LOBBY';
+  private round = 1;
   private elapsedSeconds = 0;
+  private roundBreakElapsedSeconds = 0;
   private winner: Team | undefined;
 
   join(user: string, requestedTeam: Team | undefined, random: () => number): JoinResult {
@@ -104,9 +110,26 @@ export class MatchState {
   }
 
   advanceTime(seconds: number): MatchSnapshot {
-    if (this.phase === 'ACTIVE') {
-      this.elapsedSeconds = Math.min(MATCH_DURATION_SECONDS, this.elapsedSeconds + Math.max(0, seconds));
-      if (this.elapsedSeconds >= MATCH_DURATION_SECONDS) this.finishByScore();
+    let pendingSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    if (pendingSeconds > MAX_TIME_ADVANCE_SECONDS) {
+      throw new RangeError(`Time advance cannot exceed ${MAX_TIME_ADVANCE_SECONDS} seconds.`);
+    }
+    while (pendingSeconds > 0) {
+      if (this.phase === 'ACTIVE') {
+        const available = MATCH_DURATION_SECONDS - this.elapsedSeconds;
+        const consumed = Math.min(available, pendingSeconds);
+        this.elapsedSeconds += consumed;
+        pendingSeconds -= consumed;
+        if (this.elapsedSeconds >= MATCH_DURATION_SECONDS) this.finishByScore();
+      } else if (this.phase === 'FINISHED') {
+        const available = NEXT_ROUND_DELAY_SECONDS - this.roundBreakElapsedSeconds;
+        const consumed = Math.min(available, pendingSeconds);
+        this.roundBreakElapsedSeconds += consumed;
+        pendingSeconds -= consumed;
+        if (this.roundBreakElapsedSeconds >= NEXT_ROUND_DELAY_SECONDS) this.startNextRound();
+      } else {
+        break;
+      }
     }
     return this.snapshot();
   }
@@ -114,8 +137,10 @@ export class MatchState {
   snapshot(): MatchSnapshot {
     return {
       phase: this.phase,
+      round: this.round,
       elapsedSeconds: this.elapsedSeconds,
       remainingSeconds: MATCH_DURATION_SECONDS - this.elapsedSeconds,
+      nextRoundInSeconds: this.phase === 'FINISHED' ? NEXT_ROUND_DELAY_SECONDS - this.roundBreakElapsedSeconds : undefined,
       winner: this.winner,
       kingHp: { ...this.kingHp },
       teamLikes: { ...this.teamLikes },
@@ -244,6 +269,33 @@ export class MatchState {
   private finishByScore(): void {
     this.phase = 'FINISHED';
     this.winner = this.kingHp.azul === this.kingHp.vermelho ? undefined : this.kingHp.azul > this.kingHp.vermelho ? 'azul' : 'vermelho';
+  }
+
+  private startNextRound(): void {
+    this.round += 1;
+    this.phase = 'ACTIVE';
+    this.elapsedSeconds = 0;
+    this.roundBreakElapsedSeconds = 0;
+    this.winner = undefined;
+    this.totalLikes = 0;
+    this.kingHp.azul = INITIAL_KING_HP;
+    this.kingHp.vermelho = INITIAL_KING_HP;
+    this.kingShield.azul = 0;
+    this.kingShield.vermelho = 0;
+    this.teamLikes.azul = 0;
+    this.teamLikes.vermelho = 0;
+    this.tacticalCharges.azul = 0;
+    this.tacticalCharges.vermelho = 0;
+    this.playerLikes.clear();
+    this.playerAttackThresholds.clear();
+    this.teamHealThresholds.clear();
+    this.teamAttackThresholds.clear();
+    for (const profile of this.profiles.values()) {
+      profile.score = 0;
+      profile.likes = 0;
+      profile.attacks = 0;
+      profile.energy = INITIAL_PLAYER_ENERGY;
+    }
   }
 
   private chooseBalancedTeam(random: () => number): Team {
