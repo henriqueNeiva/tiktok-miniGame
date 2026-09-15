@@ -8,9 +8,9 @@ Atualizado em **15/09/2026**. Documento de continuidade entre pessoas, IAs e age
 
 ## Objetivo e escopo atual
 
-Primeiro provar a integração real com TikTok LIVE em Node.js + TypeScript: receber comentários/comandos, curtidas e presentes, normalizar eventos e responder localmente em logs. Sem painel, overlay, jogo, API própria, envio de mensagens ao TikTok ou persistência.
+O projeto já recebe comentários/comandos, curtidas e presentes da TikTok LIVE em Node.js + TypeScript e agora possui uma primeira arena jogável para navegador/OBS. O servidor continua sem persistência, API pública ou envio de mensagens ao TikTok.
 
-Visão: [guerra_da_live_esboco.md](guerra_da_live_esboco.md). Plano amplo: [guerra_da_live_mvp.md](guerra_da_live_mvp.md). A POC técnica continua restrita a comentários, curtidas, presentes e logs; as regras abaixo definem o próximo MVP jogável.
+Visão: [guerra_da_live_esboco.md](guerra_da_live_esboco.md). Plano amplo: [guerra_da_live_mvp.md](guerra_da_live_mvp.md). A arena usa o mesmo domínio e o mesmo adaptador da conexão real; o modo demonstrativo existe apenas para inspecionar a tela sem abrir uma live.
 
 ## Regras do MVP-0.2
 
@@ -30,7 +30,8 @@ Estas regras foram definidas antes da próxima implementação. O objetivo é ma
 - **Curtidas individuais:** a cada 100 curtidas de um jogador inscrito, ele ativa um ataque básico de 10 dano no rei adversário.
 - **Curtidas do time:** a cada 200 curtidas, o time recupera 50 HP; a cada 500 curtidas, ativa um ataque coletivo de 50 dano.
 - Cura nunca ultrapassa 1.000 HP. Cada marco só pode ser ativado uma vez.
-- **Comentários:** escolhem time e estratégia. `!entrar azul`, `!entrar vermelho` e `!entrar` são os comandos de entrada; comandos de combate terão custo, cooldown e limite.
+- **Comentários:** `!entrar azul`, `!entrar vermelho` e `!entrar` escolhem o time. `!atacar` custa 2 energias, `!defender` custa 2 e adiciona 30 de escudo ao rei, e `!curar` custa 3 e recupera 50 HP.
+- Cada jogador começa com 2 energias, recebe 1 a cada 25 curtidas próprias e armazena no máximo 5. Assim, todos podem usar comandos de combate sem enviar presentes.
 - Jogador sem time pode ter curtidas registradas, mas elas não contam para equipe nem ativam ataque.
 
 ### Níveis e dano
@@ -56,7 +57,7 @@ XP é separado da pontuação da partida. O jogador recebe XP por participar, at
 
 O ranking da partida mostra pontos, curtidas contribuídas, comandos úteis, ataques, curas e MVP. O nível global usa `100 x nível atual` como XP necessário para o próximo nível. Títulos iniciais: Recruta, Guerreiro, Veterano, Campeão e Lenda da Live.
 
-### Princípio da futura tela
+### Princípio da tela
 
 Ao entrar, o jogador deve entender sem tutorial longo:
 
@@ -101,7 +102,7 @@ O domínio continua emitindo eventos sem conhecer a interface. A tela transforma
 
 Todo efeito deve responder rapidamente a três perguntas: quem agiu, qual time foi beneficiado e qual foi o resultado. A animação nunca deve esconder HP, cronômetro ou próxima meta.
 
-### Controle da partida pelo administrador
+### Controle da partida pelo administrador (planejado)
 
 A partida não começa quando o primeiro jogador entra. O lobby aceita participantes, mas o combate e o cronômetro só começam quando o perfil administrador da live enviar:
 
@@ -140,10 +141,13 @@ Comandos administrativos futuros:
 - `src/application/handle-live-event.ts`: curtidas geram `LIKE_ACKNOWLEDGED` com acumulado da sessão; `!entrar azul` e `!entrar vermelho` escolhem o time explicitamente, enquanto `!entrar` equilibra os times (aleatório no empate). Os demais comandos continuam exatos e sem argumentos. As regras de timer, XP, ranking e Gifts do MVP-0.2 estão definidas acima, mas ainda não implementadas.
 - `src/domain/match-state.ts`: estado em memória de jogadores, times, curtidas individuais e por time. Cada 100 curtidas pessoais de um jogador já inscrito dispara `RULE_TRIGGERED` com ação `PLAYER_ATTACK`; curtidas sem time não entram no placar de equipe nem disparam ataque.
 - `src/domain/match-state.ts`: cada rei começa com `1.000 HP`; `PLAYER_ATTACK` causa `10 + bônus de nível` no rei adversário, limitado a `+5`, e o HP nunca fica abaixo de zero. O domínio controla fases, cronômetro de 300 segundos, metas de cura, ataque coletivo, XP, nível e ranking. O interpretador registra `DAMAGE_APPLIED` e `KING_DEFEATED` quando aplicável.
+- `src/domain/match-state.ts`: snapshots incluem jogadores, nível, energia, HP, escudos, curtidas e cargas táticas. Ataque, defesa e cura gastam energia obtida gratuitamente pelas curtidas.
+- `src/infrastructure/arena-server.ts`: servidor HTTP sem dependências adicionais, com Server-Sent Events para transmitir snapshots e atividades do jogo ao navegador.
+- `public/`: overlay 16:9 desenhado em Canvas, com castelos, rio, pontes, unidades, HUD, feed, legenda permanente e efeitos de ataque/cura/escudo. Até 8 unidades aparecem por time e o excedente é agrupado.
 - `src/domain/events.ts`: tipos internos puros. `src/application/ports.ts`: portas funcionais `Log` e `HandleLiveEvent`. `src/infrastructure/console-log.ts`: implementação JSON por linha com horário, origem e etapa. `RESULT` contém resposta observável e contadores da sessão. Sem cooldown nesta fase de confirmação em logs.
 - `src/infrastructure/simulation.ts`: fixtures que atravessam o mesmo adaptador e interpretador. `src/config/config.ts`: validação do perfil. `src/main.ts`: composição/CLI. `test/`: testes automatizados.
 - `src/infrastructure/tiktok-live.ts`: registra listeners de chat, gifts e likes no conector real. `src/infrastructure/simulation.ts`: fixtures que atravessam o mesmo adaptador e interpretador. `src/config/config.ts`: validação do perfil. `src/main.ts`: composição/CLI. `test/`: testes automatizados.
-- `npm test` (inclui build): **18 testes aprovados, zero falhas** após incluir ciclo da partida, XP, ranking, metas de time e cargas de Rosa.
+- `npm test` (inclui build): **19 testes aprovados, zero falhas** após incluir ciclo da partida, XP, ranking, metas, cargas e energia/comandos.
 - Atenção à divergência do README upstream: o schema v3 publicado em 2.4.4 usa `user.displayId`, comentário `content`, `gift.type`, `gift.name` e `repeatEnd` numérico. Implementação lê esses campos e tolera aliases anteriores. Testes de aceitação verificam os campos contra as tipagens instaladas. Há adaptação tipada de `on` apenas na fronteira do SDK devido ao `typed-emitter` publicado com import incompatível com NodeNext; inicialização e método real foram verificados sem conexão.
 - Execução usa TypeScript compilado + test runner nativo Node. `tsx` foi removido após falha de `os.userInfo` no sandbox Windows; não é necessário para executar o projeto.
 - `enableExtendedGiftInfo: false`: consulta extra ao catálogo de presentes exigiu assinatura Business no teste real. A POC utiliza os campos dos próprios eventos (`gift.type/name`) e fallback de nome por ID; conexão básica funcionou com catálogo desativado, sem configurar nova chave.
@@ -175,6 +179,24 @@ npm run simulate
 
 Ou, após build: `npm start -- simulate`. A simulação não acessa TikTok: todos os logs têm `source: "simulation"`. Exibe dois comandos aceitos, uma curtida de 100 que dispara ataque e cinco unidades de presentes: combo Rose x3, outra Rose x1 e presente simples x1; final duplicado é descartado.
 
+### Abrir a arena no navegador ou OBS
+
+Para conferir o visual com jogadores e interações sintéticas, sem acessar o TikTok:
+
+```powershell
+npm run arena:demo
+```
+
+Abra `http://localhost:3000`. No OBS, adicione essa URL como Browser Source em proporção 16:9 (por exemplo, 1600 × 900 ou 1920 × 1080).
+
+Para usar a mesma arena com uma live real:
+
+```powershell
+npm run arena -- @nome_do_perfil
+```
+
+A porta padrão é 3000 e pode ser alterada pela variável `ARENA_PORT`. O servidor transmite apenas estado e eventos locais por SSE; o navegador não se conecta diretamente ao TikTok.
+
 ### Conectar à live real
 
 Com o perfil transmitindo ao vivo:
@@ -194,7 +216,8 @@ Esperar `CONNECTED` com roomId; de outro espectador, comentar `!entrar azul`, `!
 - Lidos os dois documentos de planejamento e confirmado escopo restrito.
 - Consultada documentação primária atual e instalado conector 2.4.4 com dependências fixadas. Instalação informou zero vulnerabilidades.
 - Implementados normalização, interpretação, logs, simulação e entrada real.
-- `npm run check`: aprovado. `npm test` (inclui build): **18 testes aprovados, zero falhas**. Casos de uso testados diretamente com porta de log em memória e com adaptador simulado.
+- `npm run check`: aprovado. `npm test` (inclui build): **19 testes aprovados, zero falhas**. Casos de uso testados diretamente com porta de log em memória e com adaptador simulado.
+- `npm run arena:demo`: servidor respondeu em `/health` e a página carregou em 1600 × 900 sem erros no console do navegador. Foram conferidos HUD, personagens, meta, energia, comandos, feed e efeitos via SSE.
 - `npm run simulate`: aprovado, dois comandos aceitos e total de cinco presentes; final repetido ignorado. Build impede emissão em caso de erro.
 - Importação, construção do SDK e `disconnect()` local: aprovados, sem chamar `connect()`. Construtor precisa de objeto de opções nesta versão; implementação o fornece.
 - **Primeira tentativa real em 15/09/2026, 12:37 (São Paulo):** usuário informou que abriu a live; arroba recebido por voz foi interpretado provisoriamente como `henrique_santos`. Executado `npm run live -- henrique_santos`. Build aprovado; `CONNECTING` às 15:37:38 UTC seguido de `CONNECT_FAILED` às 15:37:39 UTC: `Failed to retrieve Room ID from all sources.` Processo encerrou com código 1, sem `CONNECTED` ou eventos reais.
@@ -202,13 +225,13 @@ Esperar `CONNECTED` com roomId; de outro espectador, comentar `!entrar azul`, `!
 - **Captura real ainda não validada:** testes locais continuam aprovados, mas nenhuma conexão à sala ou recepção real foi obtida.
 - **Segunda tentativa real em 15/09/2026, 12:39 (São Paulo):** usuário corrigiu e confirmou o arroba exato **`henruque_santos`**. Executado `npm run live -- henruque_santos`; build aprovado. `CONNECTING` às 15:39:52 UTC → `CONNECT_FAILED` às 15:39:54 UTC com **`The requested user isn't online :(`**. Processo encerrou com código 1, sem conexão/eventos. O usuário informou que encerraria e reiniciaria a live após convite acidental; estado pode estar transitório. Aguardar confirmação do reinício e tentar somente este perfil. Não interpretar esse resultado como arroba incorreto. **Nenhum receptor ativo.**
 - **Conexão real obtida em 15/09/2026, 12:42:15 (São Paulo):** após confirmação de live reiniciada, pública e com comentários habilitados, primeira tentativa falhou na assinatura da consulta opcional de catálogo (Business exigido). Desativado `enableExtendedGiftInfo`; nova execução registrou `CONNECTED` com `username: henruque_santos`, **roomId `7685787361223166740`**, às `2026-09-15T15:42:15.361Z`. Não foi necessário configurar nova chave. `npm test` após ajuste: **9/9 aprovados**.
-- **Estado mais recente:** receptor permanece **ativo na sessão exec `83852`** desta tarefa, aguardando comentário/presente. Até a última consulta nesta etapa, nenhum evento de comentário/presente apareceu. Conexão validada; captura e interpretação de interações reais ainda pendentes. Os registros anteriores de processo encerrado são históricos, superados por este estado.
+- **Estado mais recente:** a conexão real foi validada anteriormente, mas não há receptor TikTok ativo nesta etapa. O processo ativo é somente `arena:demo`, sem acesso externo, para inspeção visual no Preview.
 - **Curtidas observadas em 15/09/2026:** a captura real recebeu comentários, mas ainda não havia listener para `WebcastEvent.LIKE`; por isso nenhuma curtida aparecia nos logs. Adicionado listener real, normalização de `count` e confirmação local `LIKE_ACKNOWLEDGED`; falta validar uma nova curtida na próxima live.
 
 ## Retomar daqui
 
-1. Implementar `!iniciar` restrito ao perfil administrador e congelar entradas após o início.
-2. Criar o esboço da tela com arena dividida, jogadores circulares, reis, HP, cronômetro, próxima meta e feed de eventos.
-3. Expor o snapshot do `MatchState` para a futura interface sem acoplar o domínio ao navegador.
-4. Implementar comandos de uso das cargas táticas com cooldowns e limites anti-pay-to-win.
+1. Implementar `!iniciar` restrito ao perfil administrador, manter o lobby por 20 segundos e congelar entradas após o início.
+2. Validar a arena em uma live real e ajustar densidade/tamanho das unidades com espectadores reais.
+3. Adicionar cooldowns explícitos aos comandos e uso das cargas táticas com limites anti-pay-to-win.
+4. Capturar foto de perfil do payload do TikTok como opção de avatar, mantendo o personagem desenhado como fallback.
 5. Persistir XP e ranking global somente depois de validar a experiência da primeira tela.
