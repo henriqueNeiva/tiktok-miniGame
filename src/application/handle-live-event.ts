@@ -32,6 +32,10 @@ export function createInterpreter(
     try {
       log('INTERNAL_EVENT', { event });
     if (event.type === 'LIKE_RECEIVED') {
+      if (match.snapshot().phase === 'FINISHED') {
+        log('EVENT_IGNORED', { user: event.user, type: event.type, reason: 'round_break' });
+        return;
+      }
       const update = match.recordLikes(event.user, event.count, event.total);
       log('PLAYER_LIKES_UPDATED', { user: event.user, count: event.count, playerLikes: update.playerLikes, team: update.team });
       if (update.team && update.teamLikes !== undefined) {
@@ -64,6 +68,10 @@ export function createInterpreter(
       return;
     }
     if (event.type === 'GIFT_RECEIVED') {
+      if (match.snapshot().phase === 'FINISHED') {
+        log('EVENT_IGNORED', { user: event.user, type: event.type, reason: 'round_break' });
+        return;
+      }
       gifts += event.quantity;
       const isRose = event.giftName.trim().toLowerCase() === 'rose';
       const gift = isRose ? match.addGift(event.user, event.quantity) : undefined;
@@ -103,6 +111,10 @@ export function createInterpreter(
       const team = match.teamOf(event.user);
       if (!team) {
         log('COMMENT_IGNORED', { user: event.user, command, reason: 'player_not_joined' });
+        return;
+      }
+      if (match.snapshot().phase !== 'ACTIVE') {
+        log('COMMENT_IGNORED', { user: event.user, command, reason: 'round_break' });
         return;
       }
       const cost = action === 'PLAYER_ATTACK' ? ATTACK_ENERGY_COST : action === 'PLAYER_DEFEND' ? DEFEND_ENERGY_COST : HEAL_ENERGY_COST;
