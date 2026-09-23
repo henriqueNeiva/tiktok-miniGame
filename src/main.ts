@@ -18,7 +18,7 @@ async function runArena(): Promise<void> {
     }
   }
   const consoleLog = createLog(demo ? 'simulation' : 'tiktok');
-  const arena = createArenaServer();
+  const arena = createArenaServer(undefined, demo);
   const log: Log = (stage, fields) => {
     consoleLog(stage, fields);
     arena.log(stage, fields);
@@ -50,7 +50,8 @@ if (mode !== 'simulate' && mode !== 'live' && mode !== 'arena' && mode !== 'logs
 } else {
   const source = mode === 'logs' ? 'tiktok' : 'simulation';
   const log = createLog(source);
-  const adapter = new TikTokAdapter(source, createInterpreter(log), log);
+  const interpreter = createInterpreter(log);
+  const adapter = new TikTokAdapter(source, interpreter, log);
   if (mode === 'simulate') {
     log('SIMULATION_START', { realConnection: false });
     simulate(adapter);
@@ -62,6 +63,8 @@ if (mode !== 'simulate' && mode !== 'live' && mode !== 'arena' && mode !== 'logs
       process.exitCode = 1;
     }
     if (username) {
+      const timer = setInterval(() => interpreter.advanceTime(1), 1000);
+      timer.unref();
       try {
         const { runLive } = await import('./infrastructure/tiktok-live.js');
         await runLive(username, adapter, log);

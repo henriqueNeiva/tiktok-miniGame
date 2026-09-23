@@ -4,13 +4,13 @@ import { createInterpreter } from '../src/application/handle-live-event.js';
 import { TikTokAdapter } from '../src/infrastructure/tiktok-adapter.js';
 import type { WebcastGiftMessage, WebcastChatMessage } from 'tiktok-live-connector';
 
-test('BDD-01: Dado um comentário !entrar vermelho, quando recebido, então confirma entrada no time vermelho', () => {
+test('BDD-01: Dado um comentário /entrar, quando recebido, então confirma entrada no time vermelho', () => {
   const records: Record<string, unknown>[] = [];
-  const handle = createInterpreter((stage, fields) => records.push({ stage, ...fields }));
+  const handle = createInterpreter((stage, fields) => records.push({ stage, ...fields }), () => 0.8);
   // Application accepts internal events without TikTok or console dependencies.
   handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!vermelho' });
   const adapter = new TikTokAdapter('simulation', handle, () => {});
-  const chat = { content: '!entrar vermelho' } satisfies Partial<WebcastChatMessage>;
+  const chat = { content: '/entrar' } satisfies Partial<WebcastChatMessage>;
   const user = { displayId: 'joao' } satisfies Partial<NonNullable<WebcastChatMessage['user']>>;
   adapter.receive('chat', { ...chat, user });
   assert.ok(records.some(r => r.stage === 'COMMAND' && r.action === 'PLAYER_JOIN' && r.team === 'vermelho'));
@@ -20,7 +20,7 @@ test('BDD-01: Dado um comentário !entrar vermelho, quando recebido, então conf
 
 test('BDD-02: Dado comando desconhecido, quando interpretado, então registra motivo sem confirmar ação', () => {
   const records: Record<string, unknown>[] = [];
-  const handle = createInterpreter((stage, fields) => records.push({ stage, ...fields }));
+  const handle = createInterpreter((stage, fields) => records.push({ stage, ...fields }), () => 0.8);
   handle({ source: 'simulation', type: 'COMMENT', user: 'joao', text: '!inexistente' });
   assert.ok(records.some(r => r.reason === 'unknown_command'));
   assert.ok(!records.some(r => r.stage === 'RESULT'));
@@ -43,3 +43,4 @@ test('BDD-03: Dada uma rosa, quando combo encerra e final repete, então confirm
   assert.equal(results[0]?.quantity, 1);
   assert.match(String(results[0]?.response), /@maria enviou Rose x1/);
 });
+

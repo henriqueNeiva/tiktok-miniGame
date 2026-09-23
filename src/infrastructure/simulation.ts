@@ -1,7 +1,7 @@
 import type { TikTokAdapter } from './tiktok-adapter.js';
 
 export function simulate(adapter: TikTokAdapter): void {
-  adapter.receive('chat', { common: { msgId: 'c1' }, user: { uniqueId: 'joao' }, comment: '!entrar vermelho' });
+  adapter.receive('chat', { common: { msgId: 'c1' }, user: { uniqueId: 'joao' }, comment: '/entrar' });
   adapter.receive('chat', { common: { msgId: 'c2' }, user: { uniqueId: 'maria' }, comment: '!entrar' });
   adapter.receive('like', { common: { msgId: 'l1' }, user: { uniqueId: 'joao' }, count: 100, total: '100' });
   adapter.receive('chat', { user: { uniqueId: 'ana' }, comment: 'Oi, live!' });
@@ -15,3 +15,4 @@ export function simulate(adapter: TikTokAdapter): void {
   adapter.receive('gift', { user: { uniqueId: 'ana' }, common: { msgId: 'g2' }, giftId: 999,
     gift: { type: 2, name: 'Presente simulado' }, repeatCount: 1 });
 }
+

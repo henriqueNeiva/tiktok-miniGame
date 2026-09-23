@@ -2,6 +2,7 @@ export type Source = 'simulation' | 'tiktok';
 export type LiveEvent = {
   source: Source;
   user: string;
+  avatarUrl?: string;
   messageId?: string;
 } & (
   | { type: 'COMMENT'; text: string }

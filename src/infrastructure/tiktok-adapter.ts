@@ -1,5 +1,6 @@
 import type { Source } from '../domain/events.js';
 import type { HandleLiveEvent, Log } from '../application/ports.js';
+import { extractAvatarUrl } from './tiktok-avatar.js';
 
 type Obj = Record<string, unknown>;
 const obj = (value: unknown): Obj => value !== null && typeof value === 'object' ? value as Obj : {};
@@ -17,7 +18,7 @@ export class TikTokAdapter {
     const user = id(obj(data.user).displayId) ?? id(obj(data.user).uniqueId) ?? id(obj(data.user).id) ?? id(obj(data.user).userId);
     const messageId = id(obj(data.common).msgId);
     if (!user) { this.log('INVALID_EVENT', { kind, reason: 'missing_user' }); return; }
-    const base = { source: this.source, user, messageId };
+    const base = { source: this.source, user, messageId, avatarUrl: extractAvatarUrl(obj(data.user)) };
     if (kind === 'like') {
       const count = data.count;
       const total = data.total;
@@ -25,6 +26,7 @@ export class TikTokAdapter {
         this.log('INVALID_EVENT', { kind, user, reason: 'invalid_like_count' }); return;
       }
       this.log('RECEIVED', { kind, user, messageId, count, total });
+      if (messageId && this.duplicate(`like:${messageId}`)) return;
       this.emit({ ...base, type: 'LIKE_RECEIVED', count: Number(count), total: typeof total === 'string' ? total : undefined });
       return;
     }
